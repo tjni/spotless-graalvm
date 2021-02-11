@@ -11,11 +11,10 @@ import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -35,18 +34,53 @@ public class App {
         .encoding(StandardCharsets.UTF_8)
         .build();
 
-    try (Stream<Path> files = Files.walk(srcDirectory).parallel()) {
-      files.filter(Files::isRegularFile)
-          .filter(file -> file.toString().endsWith(".java"))
-          .map(Path::toFile).forEach(file -> {
-        try {
-          formatter.applyTo(file);
-        } catch (IOException e) {
-          throw new UncheckedIOException(e);
+    ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+
+    List<Future<?>> tasks = new ArrayList<>();
+
+    try {
+      Files.walkFileTree(srcDirectory, new FileVisitor<>() {
+        @Override
+        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+          return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+          if (file.toString().endsWith(".java")) {
+            Future<?> task = executorService.submit(() -> {
+              try {
+                formatter.applyTo(file.toFile());
+              } catch (IOException e) {
+                throw new UncheckedIOException(e);
+              }
+            });
+
+            tasks.add(task);
+          }
+          return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+          return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+          return FileVisitResult.CONTINUE;
         }
       });
     } catch (IOException e) {
       throw new UncheckedIOException(e);
+    }
+
+    for (Future<?> task : tasks) {
+      try {
+        task.get();
+      } catch (ExecutionException | InterruptedException e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 
