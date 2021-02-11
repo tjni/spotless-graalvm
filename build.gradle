@@ -1,0 +1,36 @@
+plugins {
+  id 'java'
+  id 'application'
+  id 'com.palantir.graal' version '0.7.2'
+}
+
+repositories {
+  mavenCentral()
+}
+
+dependencies {
+  implementation 'com.diffplug.spotless:spotless-lib:2.12.0'
+  implementation 'com.diffplug.spotless:spotless-lib-extra:2.12.0'
+  implementation 'com.google.googlejavaformat:google-java-format:1.9'
+}
+
+java {
+  toolchain {
+    languageVersion = JavaLanguageVersion.of(11)
+  }
+}
+
+// Define the main class for the application
+mainClassName = 'com.github.tjni.spotless.graalvm.App'
+
+graal {
+  graalVersion '21.0.0'
+  mainClass 'com.github.tjni.spotless.graalvm.App'
+  outputName 'spotless'
+  javaVersion '11'
+  option '--no-fallback'
+  option '-H:IncludeResourceBundles=com.sun.tools.javac.resources.compiler'
+  option '-H:-UseServiceLoaderFeature'
+  // option '-H:+PrintClassInitialization'
+  // option '-H:+PrintUniverse'
+}
